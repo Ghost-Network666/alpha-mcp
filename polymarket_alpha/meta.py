@@ -3,13 +3,10 @@ Mandatory meta tools that make this MCP the single source of truth.
 
 Agents (Hermes, OpenClaw, etc.) should start here.
 
-Documentation Philosophy (as of this version):
-- NO native static .MD files are generated or shipped by this MCP.
-- All documentation is provided through lightweight native tools:
-    - get_polymarket_llms_txt()   → Live, always-fresh official Polymarket documentation
-    - get_gamma_docs()            → MCP-specific Gamma guidance (categories, parameters, workflows)
-    - get_clob_docs()             → MCP-specific CLOB guidance + routing between layers
-- This approach stays up-to-date automatically and is preferred over static Markdown.
+Documentation Philosophy:
+- This MCP uses **no static .md files**.
+- Primary source: get_polymarket_llms_txt() → always fetches the fresh official https://docs.polymarket.com/llms.txt
+- Supplementary: get_gamma_docs() and get_clob_docs() for MCP-specific parameters, categories, and routing guidance.
 """
 
 from typing import Any, Literal, Optional
@@ -60,15 +57,19 @@ def register_meta_tools(mcp: FastMCP) -> None:
         status = get_auth_status()
 
         tools = [
-            ToolManifest(name="search_markets", requires_auth=False, description="Search markets by keyword", when_to_use="Discover markets on any topic"),
-            ToolManifest(name="get_market_details", requires_auth=False, description="Rich market data + clobTokenIds", when_to_use="Get full details after search"),
-            ToolManifest(name="get_orderbook", requires_auth=False, description="Live order book depth", when_to_use="Check liquidity before trading"),
-            ToolManifest(name="get_price", requires_auth=False, description="Best bid/ask/midpoint", when_to_use="Quick price check"),
-            ToolManifest(name="get_price_history", requires_auth=False, description="Historical candles", when_to_use="Analyze price movement"),
-            ToolManifest(name="get_recent_trades", requires_auth=False, description="Recent executed trades", when_to_use="See real trading activity"),
-            ToolManifest(name="get_gamma_docs", requires_auth=False, description="MCP-specific Gamma docs (categories, parameters, workflows + routing)", when_to_use="Get structured guidance on how to use Gamma tools effectively"),
-            ToolManifest(name="get_clob_docs", requires_auth=False, description="MCP-specific CLOB docs (public + auth endpoints, parameters, Gamma↔CLOB routing)", when_to_use="Understand trading flows and how CLOB relates to Gamma"),
-            ToolManifest(name="get_polymarket_llms_txt", requires_auth=False, description="Live fetch of official https://docs.polymarket.com/llms.txt (always fresh). Best for up-to-date official reference.", when_to_use="Get the real official Polymarket documentation (recommended first stop)"),
+            ToolManifest(name="search_markets", requires_auth=False, description="Primary discovery tool. Search markets/events by keyword. Returns titles, slugs, ids, and basic pricing/volume data.", when_to_use="Start here for any topic. Always follow with get_market_details (using slug or token_id) to obtain clobTokenIds before any CLOB action."),
+            ToolManifest(name="get_market_details", requires_auth=False, description="Get complete market metadata including the critical clobTokenIds needed for all trading. Accepts slug, market_id, or token_id.", when_to_use="Call immediately after search_markets or whenever you have a slug/token. This is the bridge from discovery to execution."),
+            ToolManifest(name="get_orderbook", requires_auth=False, description="Full live order book (bids + asks) for a token_id. Essential for real liquidity assessment.", when_to_use="Check depth and realistic prices before placing any meaningful order."),
+            ToolManifest(name="get_price", requires_auth=False, description="Best bid, best ask, and midpoint for a token_id.", when_to_use="Fast price snapshot."),
+            ToolManifest(name="get_price_history", requires_auth=False, description="Historical OHLCV candles for a token_id (supports multiple intervals).", when_to_use="Analyze trends, volatility, or timing."),
+            ToolManifest(name="get_recent_trades", requires_auth=False, description="Recent public trades for a token_id.", when_to_use="Gauge real market activity and typical trade sizes."),
+            ToolManifest(name="get_active_markets", requires_auth=False, description="List currently active/tradable markets, filterable by tag.", when_to_use="Browse hot markets or markets in a specific category."),
+            ToolManifest(name="get_events", requires_auth=False, description="List events (groups of related markets).", when_to_use="Understand multi-market structures and event-level data."),
+            ToolManifest(name="get_gamma_docs", requires_auth=False, description="MCP-native reference: Gamma categories, key endpoints with parameters, recommended workflows, and precise Gamma → CLOB handoff guidance.", when_to_use="Read this when you need structured help on how to use the Gamma tools correctly and the exact sequence to trading."),
+            ToolManifest(name="get_clob_docs", requires_auth=False, description="MCP-native reference: full CLOB surface (public + authenticated), auth model, parameter contracts, and strict 'Gamma first' routing.", when_to_use="Read before any trading or when you need to understand authenticated flows, order types, and common sequencing."),
+            ToolManifest(name="get_polymarket_llms_txt", requires_auth=False, description="Live, always-fresh fetch of the official Polymarket llms.txt (https://docs.polymarket.com/llms.txt). Supports section filtering and lightweight summarization.", when_to_use="Primary source for the latest official Polymarket documentation. Use for broad reference; combine with the two MCP-specific docs tools for practical usage."),
+            ToolManifest(name="get_midpoint", requires_auth=False, description="Midpoint price for a token_id.", when_to_use="Quick fair-value estimate."),
+            ToolManifest(name="get_spread", requires_auth=False, description="Current bid-ask spread for a token_id.", when_to_use="Quick liquidity/tightness check."),
             ToolManifest(name="calculate_implied_probability", requires_auth=False, description="Price → probability", when_to_use="Think in probabilities not prices"),
             ToolManifest(name="liquidity_analysis", requires_auth=False, description="Slippage estimates for different sizes", when_to_use="Before any meaningful trade"),
             ToolManifest(name="risk_check", requires_auth=False, description="Pre-trade risk assessment", when_to_use="Strongly recommended before placing orders"),
@@ -93,6 +94,21 @@ def register_meta_tools(mcp: FastMCP) -> None:
             ToolManifest(name="gasless_approve_token", requires_auth=True, description="Convenience: Ensure approvals for a specific token", when_to_use="Quick targeted approval before trading/redeeming one market"),
             ToolManifest(name="gasless_batch_approve", requires_auth=True, description="Batch approve multiple tokens", when_to_use="Prepare many markets at once for gasless actions"),
             ToolManifest(name="gasless_redeem_all_redeemable", requires_auth=True, description="Automatically redeem every currently redeemable position (very high value)", when_to_use="One-call post-resolution claim of all winnings"),
+
+            # Missing public CLOB tools (added for completeness)
+            ToolManifest(name="get_midpoint", requires_auth=False, description="Midpoint price for a token_id.", when_to_use="Quick fair-value estimate."),
+            ToolManifest(name="get_spread", requires_auth=False, description="Current bid-ask spread for a token_id.", when_to_use="Quick liquidity/tightness check."),
+            ToolManifest(name="get_active_markets", requires_auth=False, description="List currently active/tradable markets, optionally filtered by tag.", when_to_use="Browse hot markets or markets in a specific category."),
+            ToolManifest(name="get_events", requires_auth=False, description="List events (groups of related markets).", when_to_use="Understand multi-market structures."),
+
+            # Authenticated CLOB tools
+            ToolManifest(name="get_open_orders", requires_auth=True, description="All currently resting limit orders for the wallet.", when_to_use="Monitor your active orders."),
+            ToolManifest(name="get_fills", requires_auth=True, description="Recent fills/trades executed by this wallet.", when_to_use="Review your execution history."),
+            ToolManifest(name="cancel_order", requires_auth=True, description="Cancel a single open order by ID.", when_to_use="Remove a specific unwanted resting order."),
+            ToolManifest(name="cancel_all_orders", requires_auth=True, description="Cancel every open order for this wallet (use with caution).", when_to_use="Full reset of resting orders or emergency cleanup."),
+
+            # Setup
+            ToolManifest(name="polymarket_alpha_setup_guide", requires_auth=False, description="Platform-specific setup instructions with exact copy-paste config blocks for Hermes, OpenClaw, IDEs (Claude, Cursor, etc.).", when_to_use="When setting up the MCP in a new host agent."),
         ]
 
         workflows = [
@@ -103,14 +119,22 @@ def register_meta_tools(mcp: FastMCP) -> None:
             {
                 "name": "Gasless Redeem Winnings (post-resolution)",
                 "steps": ["get_positions(redeemable_only=True)", "gasless_status", "gasless_approve_all", "gasless_redeem(condition_id, amounts, neg_risk)"]
+            },
+            {
+                "name": "Gasless On-Chain Position Management",
+                "steps": ["get_polymarket_llms_txt(section='gasless')", "gasless_wallet_info", "gasless_approve_all", "gasless_split or gasless_merge"]
             }
         ]
 
         notes = [
             "All tools are visible even in read-only mode.",
             "Tools marked requires_auth=True will fail gracefully with setup instructions if credentials are missing.",
-            "HERMES USERS: The most important first action is to call polymarket_alpha_setup_guide(platform=\"hermes\") — it contains the EXACT text you must copy into ~/.hermes/config.yaml.",
-            "Recommended docs workflow: Call get_polymarket_llms_txt() first (always fresh official source), then get_gamma_docs() + get_clob_docs() for MCP-specific parameters, categories, and routing. This is better than static .MD files.",
+            "HERMES / OPENCLAW / IDE USERS: Call polymarket_alpha_setup_guide(platform=\"hermes\" | \"openclaw\" | \"ide\") for exact copy-paste configuration.",
+            "Documentation Strategy (Native):",
+            "  • Primary source: get_polymarket_llms_txt() — always-fresh official Polymarket documentation.",
+            "  • Practical usage: get_gamma_docs() + get_clob_docs() — MCP-specific parameters, categories, workflows, and routing.",
+            "  • This MCP ships no stale .md files. Call the three docs tools instead.",
+            "Recommended first call when exploring: get_capabilities() → then the three docs tools as needed.",
         ]
 
         return CapabilitiesResponse(
@@ -159,279 +183,84 @@ def register_meta_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool
-    def polymarket_alpha_setup_guide(platform: Literal["hermes", "openclaw", "claude", "cursor", "ide", "manual"] = "hermes") -> str:
+    def polymarket_alpha_setup_guide(platform: Literal["hermes", "openclaw", "ide", "manual"] = "hermes") -> str:
         """
-        The definitive setup guide for this MCP.
+        Setup instructions for this MCP.
 
-        Call this when you need to enable trading or gasless features.
-        Returns platform-specific, copy-paste ready instructions.
+        For documentation, prefer the three native tools:
+        - get_polymarket_llms_txt()   → Always-fresh official docs (https://docs.polymarket.com/llms.txt)
+        - get_gamma_docs()            → Gamma parameters & categories
+        - get_clob_docs()             → CLOB parameters & routing
+
+        Minimal trading only requires POLYMARKET_PRIVATE_KEY.
         """
-        base = """
-POLYMARKET ALPHA MCP — SETUP GUIDE
+        base = """POLYMARKET ALPHA MCP — SETUP GUIDE
 
-This MCP requires environment variables to enable trading and gasless features.
+Call these for up-to-date information:
+  get_polymarket_llms_txt()
+  get_gamma_docs()
+  get_clob_docs()
 
-HERMES USERS: The agent MUST be given the exact configuration for ~/.hermes/config.yaml.
-             Call this tool with platform="hermes" to get the precise copy-paste block.
-
-PRIMARY METHOD (Recommended):
-1. Get your wallet private key (L1).
-2. Create a Relayer API key at https://polymarket.com/settings?tab=builder (for gasless).
-
-FOR GASLESS TRANSACTIONS (Builder Program) - FULLY IMPLEMENTED:
-- Join the Polymarket Builder Program
-- Create a Relayer API Key (you will receive RELAYER_API_KEY + ADDRESS + SECRET + PASSPHRASE)
-- POLY_SIGNATURE_TYPE now defaults to 3 (Deposit wallets)
-
-After adding the keys, call: gasless_status() and gasless_wallet_info()
-
-REQUIRED ENVIRONMENT VARIABLES:
+Minimal CLOB trading requires only POLYMARKET_PRIVATE_KEY.
 """
 
         if platform == "hermes":
             return base + """
-═══════════════════════════════════════════════════════════════════
-HERMES — EXACT CONFIGURATION INSTRUCTIONS
-═══════════════════════════════════════════════════════════════════
+HERMES (Minimal - Only POLYMARKET_PRIVATE_KEY)
 
-When installing this MCP for Hermes, the agent MUST configure it correctly
-in the user's Hermes config files.
+Add to ~/.hermes/.env:
+  POLYMARKET_PRIVATE_KEY=0xYourPrivateKeyHere
 
-───────────────────────────────────────────────────────────────────
-STEP 1: Edit ~/.hermes/.env   (store the actual secret values here)
-───────────────────────────────────────────────────────────────────
+Add to ~/.hermes/config.yaml:
+  mcp_servers:
+    polymarket-alpha:
+      command: python
+      args: ["-m", "polymarket_alpha"]
+      cwd: "C:\\\\Users\\\\YOUR_USERNAME\\\\Desktop\\\\Alpha MCP"
+      env:
+        POLYMARKET_PRIVATE_KEY: ${POLYMARKET_PRIVATE_KEY}
 
-Add the following (replace with real values):
-
-POLYMARKET_PRIVATE_KEY=0xYourFullPrivateKeyHere
-
-# === Gasless / Builder Relayer Credentials ===
-RELAYER_API_KEY=your_relayer_api_key
-RELAYER_API_KEY_ADDRESS=0xAddressAssociatedWithTheRelayerKey
-
-# Recommended for full gasless support (Builder Program)
-RELAYER_API_SECRET=your_relayer_or_builder_secret
-RELAYER_API_PASSPHRASE=your_relayer_or_builder_passphrase
-
-# POLY_SIGNATURE_TYPE is OPTIONAL (defaults to 3 = Deposit wallets)
-# Only set this line if you need to force a different wallet type:
-# POLY_SIGNATURE_TYPE=3
-
-# Optional
-BUILDER_CODE=your_builder_code_if_any
-
-
-───────────────────────────────────────────────────────────────────
-STEP 2: Edit ~/.hermes/config.yaml   (tell Hermes how to run this MCP)
-───────────────────────────────────────────────────────────────────
-
-Add this exact block under `mcp_servers`:
-
-mcp_servers:
-  polymarket-alpha:
-    command: python
-    args: ["-m", "polymarket_alpha"]
-    cwd: "C:\\\\Users\\\\YOUR_WINDOWS_USERNAME\\\\Desktop\\\\Alpha MCP"
-    env:
-      POLYMARKET_PRIVATE_KEY: ${POLYMARKET_PRIVATE_KEY}
-      RELAYER_API_KEY: ${RELAYER_API_KEY}
-      RELAYER_API_KEY_ADDRESS: ${RELAYER_API_KEY_ADDRESS}
-      RELAYER_API_SECRET: ${RELAYER_API_SECRET}
-      RELAYER_API_PASSPHRASE: ${RELAYER_API_PASSPHRASE}
-      # Only uncomment the next line if you explicitly set POLY_SIGNATURE_TYPE above
-      # POLY_SIGNATURE_TYPE: ${POLY_SIGNATURE_TYPE}
-
-CRITICAL REQUIREMENTS:
-- The "cwd" value MUST point to the folder containing this MCP on the user's machine.
-- On Windows, you must use FOUR backslashes (\\\\\\\\) in the YAML path.
-- After changing config.yaml, Hermes must be fully restarted.
-
-───────────────────────────────────────────────────────────────────
-STEP 3: Verify the setup worked
-───────────────────────────────────────────────────────────────────
-
-After restarting Hermes, the agent should immediately call:
-
-1. get_capabilities()
-2. polymarket_alpha_setup_guide(platform="hermes")
-3. gasless_status()
-
-If you see "Gasless Mode: ENABLED BY DEFAULT", the keys were loaded successfully.
+Restart Hermes, then call get_capabilities().
 """
-        elif platform == "claude":
+        elif platform in ("claude", "cursor", "ide"):
             return base + """
-═══════════════════════════════════════════════════════════════════
-CLAUDE DESKTOP — LOCAL SETUP INSTRUCTIONS
-═══════════════════════════════════════════════════════════════════
+LOCAL IDE SETUP (Claude Desktop, Cursor, Windsurf, etc.)
 
-Claude Desktop does NOT automatically load .env files like Hermes does.
-You must manually provide all environment variables in the config.
-
-STEP 1: Locate your Claude Desktop config file
-
-On Windows:
-  %APPDATA%\\Claude\\claude_desktop_config.json
-
-On macOS:
-  ~/Library/Application Support/Claude/claude_desktop_config.json
-
-STEP 2: Edit the config file
-
-Add or merge the following:
+Use a venv + full path to python:
 
 {
   "mcpServers": {
     "polymarket-alpha": {
-      "command": "C:\\\\Users\\\\YOUR_USERNAME\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe",
+      "command": "/full/path/to/.venv/bin/python",
       "args": ["-m", "polymarket_alpha"],
-      "cwd": "C:\\\\Users\\\\YOUR_USERNAME\\\\Desktop\\\\Alpha MCP",
+      "cwd": "/full/path/to/Alpha MCP",
       "env": {
-        "POLYMARKET_PRIVATE_KEY": "0xYourFullPrivateKeyHere",
-        "RELAYER_API_KEY": "your_relayer_key",
-        "RELAYER_API_KEY_ADDRESS": "0x...",
-        "RELAYER_API_SECRET": "your_secret",
-        "RELAYER_API_PASSPHRASE": "your_passphrase",
-        "POLY_SIGNATURE_TYPE": "3"
+        "POLYMARKET_PRIVATE_KEY": "0xYourPrivateKeyHere"
       }
     }
   }
 }
 
-IMPORTANT NOTES FOR CLAUDE DESKTOP:
-- Replace the "command" with the FULL path to your Python executable (do not use "python").
-- The "cwd" must point to the folder containing this MCP.
-- All secrets must be written directly in the "env" object (no ${VAR} syntax like Hermes).
-- After editing, fully restart Claude Desktop.
-- For security, consider using a dedicated wallet for this MCP.
-
-STEP 3: Verify
-
-After restarting Claude, open a new chat and ask the agent to call:
-- get_capabilities()
-- gasless_status()
-
-If it shows "Gasless Mode: ENABLED BY DEFAULT", it is working.
-
+Call get_capabilities() after restart.
 """
-
-        elif platform == "cursor":
-            return base + """
-═══════════════════════════════════════════════════════════════════
-CURSOR (CODEX) — LOCAL SETUP INSTRUCTIONS
-═══════════════════════════════════════════════════════════════════
-
-Cursor supports MCP via project or global configuration.
-
-Recommended: Create a file at the root of your project:
-.cursor/mcp.json
-
-Content:
-
-{
-  "mcpServers": {
-    "polymarket-alpha": {
-      "command": "python",
-      "args": ["-m", "polymarket_alpha"],
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "POLYMARKET_PRIVATE_KEY": "0xYourFullPrivateKeyHere",
-        "RELAYER_API_KEY": "your_relayer_key",
-        "RELAYER_API_KEY_ADDRESS": "0x...",
-        "RELAYER_API_SECRET": "your_secret",
-        "RELAYER_API_PASSPHRASE": "your_passphrase",
-        "POLY_SIGNATURE_TYPE": "3"
-      }
-    }
-  }
-}
-
-Notes:
-- Cursor can use "${workspaceFolder}" as cwd if the MCP folder is your project root.
-- Otherwise use the full absolute path.
-- You can also configure it globally in Cursor settings under "MCP".
-- Restart Cursor after changing the config.
-
-"""
-
-        elif platform == "ide":
-            return base + """
-═══════════════════════════════════════════════════════════════════
-LOCAL IDE / CODING AGENTS — CLEAN SETUP (Recommended)
-═══════════════════════════════════════════════════════════════════
-
-This path is intended for using the MCP inside local coding environments
-(Claude Desktop, Cursor, Windsurf, Continue.dev, Claude Code, etc.).
-
-We recommend treating this as a **clean, separate use case** from any experimental "Alpha" agent setups.
-
-RECOMMENDED CLEAN SETUP:
-
-1. Create a dedicated virtual environment:
-
-   cd "C:\\Users\\YourName\\Desktop\\Alpha MCP"
-   python -m venv .venv
-   .venv\\Scripts\\activate
-   pip install -e .
-
-2. Configure your IDE's MCP settings using the full path to the venv Python.
-
-Example for Cursor (.cursor/mcp.json):
-
-{
-  "mcpServers": {
-    "polymarket": {
-      "command": "C:\\\\Users\\\\YourName\\\\Desktop\\\\Alpha MCP\\\\.venv\\\\Scripts\\\\python.exe",
-      "args": ["-m", "polymarket_alpha"],
-      "cwd": "C:\\\\Users\\\\YourName\\\\Desktop\\\\Alpha MCP",
-      "env": {
-        "POLYMARKET_PRIVATE_KEY": "0xYourPrivateKey",
-        "RELAYER_API_KEY": "...",
-        "RELAYER_API_KEY_ADDRESS": "0x...",
-        "RELAYER_API_SECRET": "...",
-        "RELAYER_API_PASSPHRASE": "...",
-        "POLY_SIGNATURE_TYPE": "3"
-      }
-    }
-  }
-}
-
-Key points for local IDE use:
-- Always use a virtual environment.
-- Use the full absolute path to the Python executable inside the venv.
-- Paste secrets directly in the config (most IDEs don't support ${VAR} substitution like Hermes).
-- This keeps your local coding environment clean and isolated.
-
-After setup, ask your coding agent to run:
-- get_capabilities()
-- gasless_status()
-
-"""
-
         else:
             return base + """
-For local coding environments (Claude Desktop, Cursor, Windsurf, etc.), use:
-  polymarket_alpha_setup_guide(platform="ide")
-
-This gives the cleanest recommended setup for development workflows.
+Use platform="hermes", "openclaw", or "ide".
+Prefer get_polymarket_llms_txt(), get_gamma_docs(), and get_clob_docs() for documentation.
 """
 
     @mcp.tool
-    def get_polymarket_llms_txt(section: Optional[str] = None) -> dict:
+    def get_polymarket_llms_txt(section: Optional[str] = None, summarize: bool = False) -> dict:
         """
-        Fetches the latest official Polymarket llms.txt directly from their docs site.
+        Fetches the latest official Polymarket llms.txt from https://docs.polymarket.com/llms.txt (fresh on every call).
 
-        This is the authoritative, always-fresh, LLM-optimized documentation source
-        maintained by Polymarket.
+        WHEN TO USE: Primary / first source for any official Polymarket documentation (APIs, trading, gasless, etc.). Always call this before relying on get_gamma_docs / get_clob_docs or prior knowledge.
 
-        **This tool replaces the need for static .MD files** (this MCP ships no native .MD documentation):
-        - It stays up-to-date automatically (Polymarket updates it regularly)
-        - Agents get the real official source
-        - Combine with get_gamma_docs() + get_clob_docs() for MCP-specific parameters, categories, and routing
+        Args:
+          section: optional filter (e.g. "gamma", "clob", "trading", "gasless")
+          summarize: True for lightweight condensed output (headings + key lines)
 
-        Use this when you need the most up-to-date official information about any part
-        of Polymarket (Gamma, CLOB, gasless, trading, builders, etc.).
-
-        Optionally filter by section (e.g. "gamma", "clob", "gasless", "trading", "relayer").
+        RETURNS: dict {url, fetched_at, content|full_content, note, ...}
         """
         url = "https://docs.polymarket.com/llms.txt"
 
@@ -453,26 +282,44 @@ This gives the cleanest recommended setup for development workflows.
             "full_content": content if not section else None,
         }
 
-        if section:
-            section_lower = section.lower().strip()
+        if section or summarize:
+            section_lower = (section or "").lower().strip()
             lines = content.splitlines(keepends=True)
             filtered = []
             capture = False
+            heading_count = 0
 
             for line in lines:
                 line_lower = line.lower()
-                if line_lower.startswith("#") and section_lower in line_lower:
+
+                if section_lower and line_lower.startswith("#") and section_lower in line_lower:
                     capture = True
-                if capture:
-                    filtered.append(line)
-                    # Stop after a reasonable chunk if we hit another major header
-                    if line.startswith("# ") and section_lower not in line_lower and len(filtered) > 8:
+                    heading_count = 0
+
+                if capture or not section_lower:
+                    if summarize:
+                        # Lightweight summarization: keep headings + first line after them
+                        if line.strip().startswith("#"):
+                            filtered.append(line)
+                            heading_count = 0
+                        elif heading_count < 1:
+                            filtered.append(line)
+                            heading_count += 1
+                    else:
+                        filtered.append(line)
+
+                    if section_lower and line.startswith("# ") and section_lower not in line_lower and len(filtered) > 12:
                         break
 
+            final_content = "".join(filtered) if filtered else content[:6000] + "\n... (truncated)"
+
             result["section"] = section
-            result["content"] = "".join(filtered) if filtered else content[:8000] + "\n... (truncated - section not found, showing beginning)"
-            result["note"] = f"Filtered for section containing '{section}'"
+            result["summarize"] = summarize
+            result["content"] = final_content
+            result["note"] = f"{'Summarized ' if summarize else ''}content from official llms.txt"
+            if section:
+                result["note"] += f" (filtered for '{section}')"
         else:
-            result["note"] = "Full official llms.txt returned. Pass section='gamma', 'clob', 'gasless', 'trading' etc. to filter."
+            result["note"] = "Full official llms.txt returned. Use section=... and/or summarize=True for filtered/summarized views."
 
         return result

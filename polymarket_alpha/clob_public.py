@@ -52,14 +52,11 @@ def register_clob_public_tools(mcp: FastMCP) -> None:
     @mcp.tool
     def get_clob_docs() -> dict:
         """
-        Structured documentation for the Polymarket CLOB (V2 via py-clob-client-v2).
+        MCP-structured documentation for the Polymarket CLOB (public data + authenticated trading via py-clob-client-v2).
 
-        This tool lets agents extract parameters, categories, and exact usage patterns
-        for both public market data and authenticated trading.
+        WHEN TO USE: After get_polymarket_llms_txt() when preparing CLOB calls, clarifying auth requirements (only PRIVATE_KEY needed), order parameters, or confirming the mandatory "Gamma first → CLOB second" routing.
 
-        Recommended pattern:
-        1. Call get_polymarket_llms_txt(section="clob" or "trading") for the latest official docs
-        2. Call this tool (get_clob_docs) for MCP-specific routing, auth notes, and Gamma → CLOB workflows
+        RETURNS: dict with api_name, categories, public_endpoints, authenticated_endpoints, how_to_use steps, authentication_notes, routing_notes.
         """
         return {
             "api_name": "CLOB V2 (py-clob-client-v2)",

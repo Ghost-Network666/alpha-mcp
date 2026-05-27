@@ -70,15 +70,11 @@ def register_gamma_tools(mcp: FastMCP) -> None:
     @mcp.tool
     def get_gamma_docs() -> dict:
         """
-        Structured documentation for the Gamma API (Polymarket's market & event discovery layer).
+        MCP-structured documentation for the Gamma API (market & event discovery layer).
 
-        This is the primary tool for agents to understand parameters, categories, and how to use Gamma
-        to discover markets and obtain clobTokenIds for CLOB trading.
-        Call this to extract all relevant docs and usage patterns.
+        WHEN TO USE: After get_polymarket_llms_txt() (or alongside) when you need concrete MCP tool parameter examples, category filters, clobTokenId extraction flows, or Gamma→CLOB handoff guidance.
 
-        Recommended pattern:
-        1. Call get_polymarket_llms_txt(section="gamma") for the latest official docs
-        2. Call this tool (get_gamma_docs) for MCP-specific routing, workflows, and parameter guidance
+        RETURNS: dict with api_name, categories, main_endpoints (with params/examples), how_to_use steps, routing_notes.
         """
         return {
             "api_name": "Gamma API (V2)",
