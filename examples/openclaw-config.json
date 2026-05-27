@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "polymarket-alpha": {
+      "command": "python",
+      "args": ["-m", "polymarket_alpha"],
+      "cwd": "C:\\Users\\<your-username>\\Desktop\\Alpha MCP",
+      "env": {
+        "POLYMARKET_PRIVATE_KEY": "0x...",
+        "RELAYER_API_KEY": "...",
+        "RELAYER_API_KEY_ADDRESS": "0x...",
+        "POLY_SIGNATURE_TYPE": "3"
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "polymarket-alpha"
+version = "0.3.1"
+description = "Make Polymarket completely native inside Hermes, OpenClaw, and other agents. Full discovery, trading, and gasless transactions with zero-guessing self-documentation."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "Alpha MCP"}]
+keywords = ["mcp", "polymarket", "hermes", "openclaw", "prediction-markets", "gasless", "relayer", "fastmcp"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+  "fastmcp>=3.2.0",
+  "py-clob-client-v2>=1.0.0",
+  "py-builder-relayer-client>=0.1.0",
+  "py-builder-signing-sdk>=0.1.0",
+  "polymarket-apis>=2.2.0",
+  "pydantic>=2.5.0",
+  "eth-account>=0.11.0",
+  "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[project.scripts]
+polymarket-alpha = "polymarket_alpha.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["polymarket_alpha"]
