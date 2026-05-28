@@ -4,9 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "polymarket-alpha"
-version = "0.3.1"
+version = "0.5.0"
 description = "Make Polymarket completely native inside Hermes, OpenClaw, and other agents. Full discovery, trading, and gasless transactions with zero-guessing self-documentation."
-readme = "README.md"
+# Documentation is provided exclusively through MCP tools for agents
+# (get_clob_docs, get_gamma_docs, get_unified_sdk_guidance, polymarket_alpha_setup_guide, check_clob_auth, etc.).
+# No static README.md or QUICKSTART.md files are shipped.
+# Gasless/relayer features require RELAYER_API_KEY + PK (graceful degradation if absent).
+# All core deps included; optional advanced low-level use via get_raw_relay_client.
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [{name = "Alpha MCP"}]
@@ -29,6 +33,7 @@ dependencies = [
   "pydantic>=2.5.0",
   "eth-account>=0.11.0",
   "httpx>=0.27.0",
+  "websockets>=12.0",
 ]
 
 [project.optional-dependencies]

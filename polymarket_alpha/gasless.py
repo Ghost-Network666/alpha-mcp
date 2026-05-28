@@ -46,6 +46,8 @@ def register_gasless_tools(mcp: FastMCP) -> None:
 
         Use this first to confirm your signature_type produces the expected wallet address
         before doing approvals or redemptions.
+
+        WHEN TO USE vs check_clob_auth(): gasless tools only (on-chain CTF actions). CLOB trading auth is separate — see gasless_status() docstring.
         """
         try:
             client = get_gasless_client()
@@ -100,6 +102,8 @@ def register_gasless_tools(mcp: FastMCP) -> None:
 
         REQUIRED before gasless split/merge/redeem/convert on proxy, Safe or deposit wallets.
         Safe wallets may also need gasless_deploy_safe_wallet() first if not yet deployed.
+
+        WHEN TO USE vs check_clob_auth(): This is gasless on-chain only. For CLOB trading readiness use check_clob_auth() (distinct surface).
         """
         try:
             client = require_gasless_client()
@@ -247,7 +251,15 @@ def register_gasless_tools(mcp: FastMCP) -> None:
 
     @mcp.tool
     def gasless_status() -> dict:
-        """Quick health check of gasless relayer integration + current wallet + whether approvals are likely set."""
+        """
+        Quick health check of gasless relayer integration + current wallet + whether approvals are likely set.
+
+        WHEN TO USE vs check_clob_auth():
+        - Call gasless_status() / gasless_wallet_info() FIRST for any on-chain gasless actions (split, merge, redeem, approve, transfers via relayer).
+        - Call check_clob_auth(include_raw=True) FIRST (separately) for CLOB off-chain trading (place_limit_order, balances on exchange, orders).
+        These are two distinct auth surfaces: gasless = on-chain Polygon (proxy/safe/deposit wallets via relayer), CLOB = off-chain signed orders.
+        Use get_mcp_health_report() to see both at once.
+        """
         status = get_auth_status()
         info = gasless_wallet_info()
         creds = get_relayer_creds()
@@ -299,7 +311,7 @@ def register_gasless_tools(mcp: FastMCP) -> None:
                 "base_eoa_address": base_address,
                 "pol_balance": client.get_pol_balance(),
                 "pusd_balance": client.get_pusd_balance(),
-                "note": "These are the balances the relayer will use for gasless transactions.",
+                "note": "pUSD is Polymarket's collateral token on Polygon. These on-chain balances power gasless split/merge/redeem (different from CLOB get_clob_balance).",
             }
             return result
         except Exception as e:
@@ -571,3 +583,59 @@ def register_gasless_tools(mcp: FastMCP) -> None:
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    # =====================
+    # High-level one-shot convenience (fills the "easy gasless position entry" UX gap)
+    # =====================
+
+    @mcp.tool
+    def gasless_prepare_for_trading() -> dict:
+        """
+        HIGH-VALUE CONVENIENCE: One-shot preparation for gasless on-chain trading.
+
+        Performs (in order):
+        - gasless_wallet_info() to confirm addresses and signature_type
+        - gasless_approve_all() (idempotent; safe to re-run)
+        - gasless_status() summary + pUSD balance
+
+        Returns a consolidated readiness report with clear next steps.
+        Call this early when you plan to use gasless_split / redeem / etc.
+
+        WHEN TO USE: Before gasless position entry or redemption flows.
+        This is the gasless equivalent of "check_clob_auth + get_clob_balance".
+        (Use check_clob_auth separately for CLOB orderbook trading.)
+        """
+        try:
+            wallet = gasless_wallet_info()
+            approvals = gasless_approve_all()
+            status = gasless_status()
+            pusd = None
+            try:
+                pusd = gasless_get_pusd_balance()
+            except Exception:
+                pass
+
+            ready = bool(
+                wallet.get("gasless_ready") or status.get("auth_status", {}).get("gasless_ready")
+            )
+
+            return {
+                "status": "success",
+                "action": "prepare_for_trading",
+                "gasless_ready": ready,
+                "wallet_summary": {
+                    "active_address": wallet.get("active_wallet_address") or wallet.get("base_address"),
+                    "signature_type": wallet.get("signature_type"),
+                },
+                "approvals": approvals,
+                "pusd_balance": pusd.get("pusd_balance") if pusd else "unknown",
+                "full_status": status,
+                "recommended_next": [
+                    "If ready=true: use gasless_split(condition_id, amount) to enter positions gaslessly.",
+                    "Or gasless_redeem_all_redeemable() after resolution.",
+                    "Monitor with gasless_get_balances() + listen_for_ws_events on User/Market channels.",
+                ],
+                "note": "This is the recommended first gasless prep call (distinct from CLOB check_clob_auth).",
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e), "hint": "Ensure PK + RELAYER_API_KEY. Call gasless_status() for details."}

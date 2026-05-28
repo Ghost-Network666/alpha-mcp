@@ -1,5 +1,5 @@
 """
-Robust configuration for polymarket-alpha (V2 CLOB + Gamma stack).
+Robust configuration for polymarket-alpha (current production CLOB + Gamma stack).
 
 Supports:
 - Simple mode: POLYMARKET_PRIVATE_KEY only (CLOB trading via py-clob-client-v2)
@@ -9,8 +9,23 @@ Uses current production endpoints:
 - CLOB: https://clob.polymarket.com (py-clob-client-v2)
 - Gamma: https://gamma-api.polymarket.com
 
+Polymarket's recommended future direction is the unified `polymarket-client` SDK.
+See get_unified_sdk_guidance() for details and migration notes.
+The MCP high-level tools abstract the underlying client — preferred for agents.
+
 The MCP is the single source of truth. Agents should call get_capabilities()
 or polymarket_alpha_setup_guide() when confused.
+
+SECURITY
+-------
+This file ONLY READS credentials from the process environment (os.environ).
+It never writes secrets to disk, never logs them, and never embeds example values.
+
+When modifying this file or related docs:
+- Never introduce real PK / CLOB_* values.
+- All example text must use placeholders only (${PK}, 0xYour..., etc.).
+- Real credential files (any file containing live CLOB_API_KEY, PK, etc.)
+  must remain gitignored (see root .gitignore).
 """
 
 import os
@@ -62,11 +77,71 @@ def _get_env(name: str) -> Optional[str]:
     return val.strip() if val else None
 
 
+# =============================================================================
+# Official credential names for the new simpler native Hermes / agent-harness flow
+# (preferred over legacy POLYMARKET_* names)
+# =============================================================================
+OFFICIAL_PK_VARS = ("PK", "POLYMARKET_PRIVATE_KEY")
+OFFICIAL_CLOB_API_KEY_VARS = ("CLOB_API_KEY", "POLYMARKET_CLOB_API_KEY")
+OFFICIAL_CLOB_SECRET_VARS = ("CLOB_SECRET", "POLYMARKET_CLOB_SECRET")
+OFFICIAL_CLOB_PASSPHRASE_VARS = ("CLOB_PASS_PHRASE", "POLYMARKET_CLOB_PASS_PHRASE")
+OFFICIAL_CLOB_URL_VARS = ("CLOB_API_URL", "POLYMARKET_CLOB_HOST")
+OFFICIAL_FUNDER_VARS = ("FUNDER", "POLY_FUNDER", "CLOB_FUNDER", "POLYMARKET_FUNDER")
+OFFICIAL_SIG_TYPE_VARS = ("POLY_SIGNATURE_TYPE", "SIGNATURE_TYPE")
+
+
+def _get_first_env(vars_tuple: tuple[str, ...]) -> Optional[str]:
+    for name in vars_tuple:
+        val = _get_env(name)
+        if val:
+            return val
+    return None
+
+
+def get_official_credentials() -> dict:
+    """
+    Returns the preferred native credential set.
+    Primary names: PK + CLOB_API_KEY / CLOB_SECRET / CLOB_PASS_PHRASE
+    Falls back to legacy names for compatibility (with future deprecation).
+    """
+    pk = _get_first_env(OFFICIAL_PK_VARS)
+    clob_api_key = _get_first_env(OFFICIAL_CLOB_API_KEY_VARS)
+    clob_secret = _get_first_env(OFFICIAL_CLOB_SECRET_VARS)
+    clob_passphrase = _get_first_env(OFFICIAL_CLOB_PASSPHRASE_VARS)
+    clob_url = _get_first_env(OFFICIAL_CLOB_URL_VARS)
+    funder = _get_first_env(OFFICIAL_FUNDER_VARS)
+    sig_type_str = _get_first_env(OFFICIAL_SIG_TYPE_VARS)
+
+    has_direct_clob_creds = bool(clob_api_key and clob_secret and clob_passphrase)
+
+    # Detect legacy usage
+    using_legacy = False
+    if not pk and _get_env("POLYMARKET_PRIVATE_KEY"):
+        pk = _get_env("POLYMARKET_PRIVATE_KEY")
+        using_legacy = True
+    if not has_direct_clob_creds and _get_env("POLYMARKET_PRIVATE_KEY"):
+        # We still support derivation from legacy PK only
+        pass
+
+    return {
+        "pk": pk,
+        "clob_api_key": clob_api_key,
+        "clob_secret": clob_secret,
+        "clob_passphrase": clob_passphrase,
+        "clob_url": clob_url,
+        "funder": funder,
+        "signature_type": sig_type_str,
+        "has_direct_clob_creds": has_direct_clob_creds,
+        "using_legacy_names": using_legacy or bool(_get_env("RELAYER_API_KEY") or _get_env("BUILDER_API_KEY")),
+    }
+
+
 def get_auth_status() -> AuthStatus:
-    pk = _get_env("POLYMARKET_PRIVATE_KEY")
+    creds = get_official_credentials()
+    pk = creds["pk"]
     relayer_key = _get_env("RELAYER_API_KEY") or _get_env("BUILDER_API_KEY")
     relayer_address = _get_env("RELAYER_API_KEY_ADDRESS")
-    sig_type_str = _get_env("POLY_SIGNATURE_TYPE")
+    sig_type_str = creds["signature_type"] or _get_env("POLY_SIGNATURE_TYPE")
 
     has_pk = bool(pk and len(pk) > 10)
     has_relayer = bool(relayer_key and relayer_address)
@@ -118,22 +193,31 @@ def get_auth_status() -> AuthStatus:
 
 
 def require_private_key() -> str:
-    pk = _get_env("POLYMARKET_PRIVATE_KEY")
+    pk = _get_first_env(OFFICIAL_PK_VARS)
     if not pk:
         raise PermissionError(
-            "This action requires POLYMARKET_PRIVATE_KEY.\n"
-            "Call polymarket_alpha_setup_guide(platform='hermes') or 'openclaw' for exact instructions."
+            "This action requires PK (or legacy POLYMARKET_PRIVATE_KEY).\n"
+            "Call polymarket_alpha_setup_guide(platform='hermes') for exact copy-paste instructions.\n"
+            "Preferred: put PK + CLOB_* credentials directly in your agent's mcp_servers env block."
         )
     return pk
 
 
 def get_clob_host() -> str:
-    # Using py-clob-client-v2 against the current production CLOB endpoint (V2 stack)
-    return _get_env("POLYMARKET_CLOB_HOST") or "https://clob.polymarket.com"
+    # Using py-clob-client-v2 against the current production CLOB endpoint.
+    # (Unified `polymarket-client` is the official recommended future path — see get_unified_sdk_guidance().)
+    creds = get_official_credentials()
+    return creds["clob_url"] or _get_env("POLYMARKET_CLOB_HOST") or "https://clob.polymarket.com"
 
 
 def get_chain_id() -> int:
     return int(_get_env("POLYMARKET_CHAIN_ID") or "137")
+
+
+# Official pUSD (Polymarket USD) collateral token on Polygon
+# This is the ERC-20 token used for on-chain gasless actions (split/merge/redeem, transfers).
+# It is 1:1 backed by USDC. Use this address for on-chain balance checks in gasless flows.
+PUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"  # Proxy (user-facing) address on Polygon (chain 137)
 
 
 def get_gamma_url() -> str:
@@ -154,23 +238,69 @@ _authenticated_clob_client: ClobClient | None = None
 
 def get_authenticated_clob_client() -> ClobClient:
     """
-    Returns a fully authenticated ClobClient using L1 private key + derived L2 creds.
+    Returns a fully authenticated ClobClient.
 
-    This follows the official recommended pattern from py-clob-client-v2 examples.
-    Raises clear PermissionError if POLYMARKET_PRIVATE_KEY is missing.
+    Native flow (preferred):
+    - Provide PK + CLOB_API_KEY / CLOB_SECRET / CLOB_PASS_PHRASE directly (no derivation).
+    - signature_type defaults to 3 (Deposit wallets). FUNDER can be supplied via FUNDER / POLY_FUNDER env.
+    - If only PK present: derives L2 creds (legacy/simple EOA path) but still applies signature_type=3 + funder when available.
+
+    This is the "much simpler native use" path for Hermes and agent harnesses.
     """
     global _authenticated_clob_client
     if _authenticated_clob_client is not None:
         return _authenticated_clob_client
 
     private_key = require_private_key()
+    creds_info = get_official_credentials()
 
-    host = get_clob_host()
+    host = creds_info["clob_url"] or get_clob_host()
     chain_id = get_chain_id()
 
-    # Step 1: Create temp client to derive L2 API credentials from L1
+    # Determine signature_type (internal default 3, no mandatory env var)
+    sig_type = 3
+    if creds_info["signature_type"]:
+        try:
+            sig_type = int(creds_info["signature_type"])
+        except Exception:
+            sig_type = 3
+
+    funder = creds_info["funder"]
+
+    if creds_info["has_direct_clob_creds"]:
+        # === SIMPLE NATIVE PATH: pre-provided L2 creds (recommended for harnesses) ===
+        creds = ClobApiCreds(
+            api_key=creds_info["clob_api_key"],
+            api_secret=creds_info["clob_secret"],
+            api_passphrase=creds_info["clob_passphrase"],
+        )
+
+        client_kwargs = {
+            "host": host,
+            "chain_id": chain_id,
+            "key": private_key,
+            "creds": creds,
+        }
+        if sig_type in (1, 2, 3):
+            client_kwargs["signature_type"] = sig_type
+        if funder:
+            client_kwargs["funder"] = funder
+
+        client = ClobClient(**client_kwargs)
+        _authenticated_clob_client = client
+        return client
+
+    # === FALLBACK / LEGACY PATH: derive L2 from PK (still useful for pure EOA) ===
     temp_client = ClobClient(host=host, chain_id=chain_id, key=private_key)
-    creds_dict = temp_client.create_or_derive_api_key()
+    try:
+        creds_dict = temp_client.create_or_derive_api_key()
+    except Exception as e:
+        # Surface a very clear error for harness users
+        raise PermissionError(
+            f"Failed to derive CLOB API credentials from PK: {e}\n"
+            "For simpler native use, generate L2 creds once (apiKey/secret/passphrase) and provide them as CLOB_API_KEY / CLOB_SECRET / CLOB_PASS_PHRASE + PK.\n"
+            "See polymarket_alpha_setup_guide(platform='hermes') for the exact config block."
+        ) from e
 
     creds = ClobApiCreds(
         api_key=creds_dict["apiKey"],
@@ -178,17 +308,18 @@ def get_authenticated_clob_client() -> ClobClient:
         api_passphrase=creds_dict["passphrase"],
     )
 
-    # Step 2: Full client (modern users usually use signature_type=3 + funder for deposit wallets)
-    # This is the V2 CLOB authenticated client path.
-    # For simplicity and broad compatibility, we start with basic EOA flow.
-    # Advanced users can extend this later.
-    client = ClobClient(
-        host=host,
-        chain_id=chain_id,
-        key=private_key,
-        creds=creds,
-    )
+    client_kwargs = {
+        "host": host,
+        "chain_id": chain_id,
+        "key": private_key,
+        "creds": creds,
+    }
+    if sig_type in (1, 2, 3):
+        client_kwargs["signature_type"] = sig_type
+    if funder:
+        client_kwargs["funder"] = funder
 
+    client = ClobClient(**client_kwargs)
     _authenticated_clob_client = client
     return client
 
@@ -208,16 +339,18 @@ def log_startup_status() -> None:
 
     if status.gasless_ready:
         print("✓ Gasless Mode: ENABLED BY DEFAULT")
-        print("  (POLYMARKET_PRIVATE_KEY + RELAYER credentials detected)")
+        print("  (PK + RELAYER credentials detected)")
         print("  Signature type defaults to 3 (Deposit wallets).\n")
     else:
         print("⚠️  Trading / Gasless features are LIMITED or DISABLED.")
         print("   The agent should call: polymarket_alpha_setup_guide(platform=\"hermes\")\n")
 
-    print("For Hermes users: You must correctly configure this MCP in:")
-    print("  1. ~/.hermes/.env          ← store the actual secret values")
-    print("  2. ~/.hermes/config.yaml   ← tell Hermes how to launch this MCP")
-    print("\nCall polymarket_alpha_setup_guide(platform=\"hermes\") for the EXACT copy-paste configuration.\n")
+    print("For Hermes / agent harness users (recommended native flow):")
+    print("  Put credentials INSIDE the mcp_servers entry in config.yaml (see setup guide).")
+    print("  Primary vars: PK, CLOB_API_KEY, CLOB_SECRET, CLOB_PASS_PHRASE (CLOB_API_URL optional).")
+    print("  First actions after launch (ALWAYS): get_mcp_health_report() then get_capabilities(); for trading also check_clob_auth(include_raw=True)")
+    print("  Real-time data (major strength): start_full_market_monitor / watch_* / start_realtime_market_watcher (Gamma+WS) + listen_for_ws_events / get_latest_ws_messages (consume) + get_realtime_trading_guide() + get_realtime_helper_patterns()")
+    print("\nCall polymarket_alpha_setup_guide(platform=\"hermes\") for the EXACT copy-paste block.\n")
     print("="*60 + "\n")
 
 
@@ -226,8 +359,8 @@ def log_startup_status() -> None:
 # =============================================================================
 
 def get_user_address() -> Optional[str]:
-    """Derive checksum address from POLYMARKET_PRIVATE_KEY if present."""
-    pk = _get_env("POLYMARKET_PRIVATE_KEY")
+    """Derive checksum address from PK (preferred) or legacy POLYMARKET_PRIVATE_KEY."""
+    pk = _get_first_env(OFFICIAL_PK_VARS)
     if not pk:
         return None
     try:
@@ -281,7 +414,7 @@ def get_gasless_client() -> Optional["PolymarketGaslessWeb3Client"]:
     if not _HAS_POLYMARKET_APIS or PolymarketGaslessWeb3Client is None:
         return None
 
-    pk = _get_env("POLYMARKET_PRIVATE_KEY")
+    pk = _get_first_env(OFFICIAL_PK_VARS)
     relayer_key = _get_env("RELAYER_API_KEY") or _get_env("BUILDER_API_KEY")
     secret = _get_env("RELAYER_API_SECRET") or _get_env("BUILDER_SECRET")
     passphrase = _get_env("RELAYER_API_PASSPHRASE") or _get_env("BUILDER_PASSPHRASE")
@@ -359,9 +492,9 @@ def require_gasless_client() -> "PolymarketGaslessWeb3Client":
     if client is None:
         status = get_auth_status()
         raise PermissionError(
-            "Gasless operations require POLYMARKET_PRIVATE_KEY + RELAYER_API_KEY (or BUILDER_API_KEY).\n"
-            "POLY_SIGNATURE_TYPE is now optional — the system will auto-detect or default to 3 (Deposit wallets).\n"
-            f"Current auth: {status.mode}. Call polymarket_alpha_setup_guide() for Builder Program instructions."
+            "Gasless operations require PK (or POLYMARKET_PRIVATE_KEY) + RELAYER_API_KEY (or BUILDER_API_KEY).\n"
+            "POLY_SIGNATURE_TYPE is optional — defaults to 3 (Deposit wallets).\n"
+            f"Current auth: {status.mode}. Call polymarket_alpha_setup_guide(platform='hermes') for exact instructions."
         )
     return client
 
@@ -371,11 +504,29 @@ def get_raw_relay_client() -> Optional["RelayClient"]:
     Returns a low-level py-builder-relayer-client RelayClient.
     Useful for advanced operations (Safe deployment, custom batches, etc.)
     that are not covered by the higher-level PolymarketGaslessWeb3Client.
+
+    Credential requirements (Builder vs remote signer patterns):
+    - PK + RELAYER_API_KEY (or BUILDER_API_KEY) are always required.
+    - For the supported local Builder pattern (preferred): also provide
+      RELAYER_API_SECRET + RELAYER_API_PASSPHRASE. This populates
+      local_builder_creds=BuilderApiKeyCreds(...) in BuilderConfig.
+    - The legacy remote-builder fallback (RemoteBuilderConfig) previously
+      used a non-functional hardcoded placeholder URL and has been cleaned up.
+    - Remote signer pattern requires an explicit, valid production signer URL
+      configured by the user (no placeholder or example.com allowed).
+
+    Returns None if core prerequisites are absent (graceful, consistent with
+    other get_* helpers). Raises a clear actionable error (caught + logged)
+    for misconfigured remote fallback attempts.
+
+    Most callers should use get_gasless_client() / require_gasless_client()
+    unless low-level RelayClient access is explicitly needed for custom flows.
+    For setup details call polymarket_alpha_setup_guide(platform='hermes').
     """
     if not _HAS_BUILDER_RELAYER or RelayClient is None:
         return None
 
-    pk = _get_env("POLYMARKET_PRIVATE_KEY")
+    pk = _get_first_env(OFFICIAL_PK_VARS)
     relayer_key = _get_env("RELAYER_API_KEY") or _get_env("BUILDER_API_KEY")
     secret = _get_env("RELAYER_API_SECRET") or _get_env("BUILDER_SECRET")
     passphrase = _get_env("RELAYER_API_PASSPHRASE") or _get_env("BUILDER_PASSPHRASE")
@@ -395,9 +546,18 @@ def get_raw_relay_client() -> Optional["RelayClient"]:
                 )
             )
         else:
-            # Fallback to remote-style if only key is present (less common)
-            builder_config = BuilderConfig(
-                remote_builder_config=RemoteBuilderConfig(url="https://your-signer.example.com")  # placeholder
+            # Remote builder / remote signer fallback deliberately removed.
+            # No more dummy URL. Raise clear guidance pointing to correct patterns.
+            raise RuntimeError(
+                "get_raw_relay_client remote-builder fallback is unavailable (placeholder URL removed).\n\n"
+                "Correct setup (Builder vs remote signer patterns):\n"
+                "  1. Builder pattern (recommended): Provide RELAYER_API_SECRET + RELAYER_API_PASSPHRASE\n"
+                "     together with RELAYER_API_KEY (or BUILDER_API_KEY) + PK. This enables the\n"
+                "     local_builder_creds path used by both gasless client and raw relay client.\n"
+                "  2. Remote signer pattern: Explicitly supply a real remote signer service URL\n"
+                "     (your production signing endpoint). Never use example/placeholder domains.\n\n"
+                "Call polymarket_alpha_setup_guide(platform='hermes') for the exact env vars and config.\n"
+                "Prefer higher-level require_gasless_client() for standard advanced gasless operations."
             )
 
         client = RelayClient(
@@ -414,7 +574,12 @@ def get_raw_relay_client() -> Optional["RelayClient"]:
 
 
 def get_relayer_creds() -> Optional[dict]:
-    """Return current relayer/builder credentials (if present)."""
+    """
+    Return current relayer/builder credentials (if present).
+    SECURITY: This is INTERNAL only. Callers (health, gasless_status, wallet_info) MUST
+    only expose booleans/presence flags — never the raw key/secret/passphrase values.
+    Never log or return real secrets from any public tool path.
+    """
     key = _get_env("RELAYER_API_KEY") or _get_env("BUILDER_API_KEY")
     secret = _get_env("RELAYER_API_SECRET") or _get_env("BUILDER_SECRET")
     passphrase = _get_env("RELAYER_API_PASSPHRASE") or _get_env("BUILDER_PASSPHRASE")

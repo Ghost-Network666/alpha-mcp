@@ -33,17 +33,116 @@ env/
 *.swo
 *~
 
-# Secrets & environment
-.env
+# =============================================================================
+# SECRETS & CREDENTIALS (CRITICAL - DO NOT REMOVE OR WEAKEN)
+# This MCP handles highly sensitive trading credentials:
+#   PK (private key), CLOB_API_KEY, CLOB_SECRET, CLOB_PASS_PHRASE,
+#   RELAYER_API_KEY, BUILDER_* keys, FUNDER addresses, etc.
+#
+# Any file that could contain real CLOB / Polymarket / wallet credentials
+# MUST be ignored. Never commit real secrets.
+# =============================================================================
+
+# Ignore ALL real .env* files (very broad on purpose for safety)
+# This catches .env, .env.local, .env.production, .envrc, myapp.env, etc.
+.env*
 *.env
-.env.*
+
+# EXCEPTION: Only these safe template files are allowed (and must stay placeholder-only)
+!.env.example
+!.env.template
+!.env.sample
+!*.env.example
+
+# Protect common secret / wallet / credential file patterns
 secrets/
 *.pem
 *.key
+*.p12
+*.pfx
+wallet*.json
+private*.json
+clob*.json
+*credentials*
+*secret*
 
+# Agent / MCP harness config files that commonly contain real env blocks
+# (users put PK + CLOB_* directly inside mcp_servers entries)
+config.yaml
+config.yml
+hermes*.yaml
+hermes*.yml
+mcp*.yaml
+mcp*.yml
+*config*.yaml
+*config*.yml
+
+# Python dotenv / config that people sometimes use for local testing
+settings.local.py
+local_settings.py
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# =============================================================================
+# IDE & Editor
+# =============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# =============================================================================
 # OS
+# =============================================================================
 .DS_Store
 Thumbs.db
 
-# MCP / Agent specific
+# =============================================================================
+# MCP / Agent / Runtime
+# =============================================================================
 *.log
+*.pid
+tmp/
+temp/
+
+# =============================================================================
+# SAFE FILES THAT SHOULD BE COMMITTED (examples / templates)
+# =============================================================================
+# .env.example          ← OK and encouraged (contains only placeholders)
+# .env.template         ← OK
+# QUICKSTART.md         ← must only ever contain ${VAR} or "0xYour..." placeholders
+# README.md             ← same rule
+#
+# When adding new documentation or examples:
+#   - ALWAYS use placeholders: ${PK}, ${CLOB_API_KEY}, 0xYourPrivateKeyHere, ...
+#   - NEVER paste a real private key, CLOB secret, or API key.
+# =============================================================================
