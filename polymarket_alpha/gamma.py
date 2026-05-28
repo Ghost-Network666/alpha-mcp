@@ -418,5 +418,5 @@ def register_gamma_tools(mcp: FastMCP) -> None:
                 "when_to_use_market_details": "When you already have a specific slug or saw a single market in search results."
             },
             "see_also_high_value_meta": "For full MCP readiness always call get_mcp_health_report() first. For realtime/event-driven: get_realtime_trading_guide() + get_realtime_helper_patterns() + get_ws_event_driven_patterns(). For SDK direction: get_unified_sdk_guidance(). Complete CLOB surface (incl. WS): get_clob_docs().",
-            "official_docs_via_native_tools": "Use list_polymarket_docs() + get_polymarket_doc(path='advanced/neg-risk.md' or 'concepts/positions-tokens.md' etc.) to read the live authoritative .md files for any Gamma/CLOB topic.",
+            "official_docs_via_native_tools": "For the complete official Gamma + events + markets + tags + sports API reference pages, call get_polymarket_sitemap() then get_polymarket_doc() on the relevant api-reference/events/* or markets/* paths. Also use list_polymarket_docs() for the curated high-signal subset.",
         }
