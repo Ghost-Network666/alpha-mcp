@@ -105,12 +105,12 @@ def get_clob_auth_diagnostic(include_raw: bool = False) -> dict:
         sig = diag.get("effective_signature_type")
         if sig == 3 or str(sig) == "3":
             diag["signature_type_3_warnings"] = [
-                "For signature_type=3 you MUST use your DEPOSIT WALLET address as the 'funder', not your EOA.",
-                "Find it at polymarket.com → Profile → Wallet (different 0x address from your MetaMask/EOA).",
-                "CRITICAL: You must place at least ONE manual order via the official Polymarket website UI first.",
-                "Without that manual UI trade, your first API order will very likely fail with 'signer mismatch'.",
-                "This is a common source of pain (real root cause of many reports around clob-client issue #70).",
-                "After one small manual trade in the UI, API orders should work normally with the correct funder."
+                "signature_type=3 (POLY_1271 / ERC-1271) is now the primary path for serious/mainnet users.",
+                "funder MUST be your DEPOSIT WALLET address (the ERC-1967 proxy shown at polymarket.com → Profile → Wallet or /settings), NOT your EOA/MetaMask address.",
+                "You MUST first log into polymarket.com with the owner EOA, confirm the deposit wallet exists, fund *the deposit wallet* (not the EOA) with pUSD, complete necessary approvals, and place at least one manual order via the UI.",
+                "Without the UI onboarding step, you will commonly see errors such as 'maker address not allowed, please use the deposit wallet flow' or 'the order signer address has to be the address of the API KEY'.",
+                "After proper UI activation + one small manual trade, API orders with the correct funder + signature_type=3 should work.",
+                "Always call update_balance_allowance(..., signature_type=3) after funding/approvals when using this flow."
             ]
 
         return diag

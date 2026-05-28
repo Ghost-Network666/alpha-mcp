@@ -36,12 +36,17 @@ mcp_servers:
 
 **Best practice**: Put real secrets in `~/.hermes/.env` and reference them with `${VAR}` (Hermes supports this substitution).
 
+**Critical for most users (signature_type=3 / Deposit wallets)**:
+- `FUNDER` must be the deposit wallet address shown at polymarket.com → Profile → Wallet (NOT your EOA).
+- You **must** first log into the official UI with the owner EOA, fund the deposit wallet with pUSD, and place at least one manual order via the website. This activates the wallet for API use.
+- Without the UI step you will hit "maker address not allowed" or signer mismatch errors.
+
 After adding/restarting Hermes, the very first calls inside your agent **must** be:
 
 1. `get_mcp_health_report()`
-2. `check_clob_auth(include_raw=true)`   ← mandatory before any trading
+2. `check_clob_auth(include_raw=true)`   ← mandatory before any trading (it will surface the exact sig=3 warnings)
 
-Then use only the high-level exposed tools (`search_markets` → `get_clob_token_ids` → `place_limit_order`, `start_full_market_monitor`, gasless tools, etc.).
+Then use only the high-level exposed tools.
 
 ## First Actions (every session)
 

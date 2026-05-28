@@ -974,7 +974,7 @@ mcp_servers:
       CLOB_SECRET: "${CLOB_SECRET}"
       CLOB_PASS_PHRASE: "${CLOB_PASS_PHRASE}"
       CLOB_API_URL: "https://clob.polymarket.com"
-      # FUNDER: "0xYourDepositWalletAddress"   # Required for signature_type=3 (deposit wallets). Must be the deposit/proxy address from polymarket.com Profile → Wallet, NOT your EOA.
+      # FUNDER: "0xYourDepositWalletAddress"   # Required for signature_type=3. Must be the deposit wallet (from polymarket.com Profile → Wallet), not the EOA. You must also do one manual UI trade first or API orders fail with "maker address not allowed".
     # Optional but recommended for powerful servers:
     # tools:
     #   include: [get_mcp_health_report, check_clob_auth, search_markets, get_clob_token_ids, place_limit_order, ...]
@@ -1201,9 +1201,11 @@ For raw SDK decisions call get_unified_sdk_guidance().
             "categories": {
                 "trading": [
                     "trading/overview.md", "trading/quickstart.md", "trading/gasless.md",
-                    "trading/deposit-wallets.md", "trading/fees.md", "trading/orderbook.md",
+                    "trading/deposit-wallets.md",   # authoritative for sig=3 + funder requirements
+                    "trading/fees.md", "trading/orderbook.md",
                     "trading/bridge/deposit.md", "trading/bridge/quote.md", "trading/bridge/status.md",
                     "trading/ctf/overview.md", "trading/ctf/split.md", "trading/ctf/merge.md", "trading/ctf/redeem.md",
+                    "api-reference/authentication.md",  # sig types, client init, funder, troubleshooting
                 ],
                 "concepts": [
                     "concepts/markets-events.md", "concepts/positions-tokens.md", "concepts/pusd.md",
