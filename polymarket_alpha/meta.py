@@ -202,6 +202,8 @@ def register_meta_tools(mcp: FastMCP) -> None:
             ToolManifest(name="get_clob_docs", requires_auth=False, description="MCP-native reference: full CLOB surface (public + authenticated), auth model, parameter contracts, and strict 'Gamma first' routing.", when_to_use="Read before any trading or when you need to understand authenticated flows, order types, and common sequencing."),
             ToolManifest(name="get_unified_sdk_guidance", requires_auth=False, description="Guidance on using Polymarket's new recommended unified `polymarket-client` SDK vs the py-clob-client-v2 currently powering this MCP. Decision criteria, migration notes, examples, and MCP recommendations for raw SDK usage.", when_to_use="When choosing or migrating to raw SDKs, writing custom low-level code, or understanding Polymarket's official Python direction."),
             ToolManifest(name="get_polymarket_llms_txt", requires_auth=False, description="THE PRIMARY SOURCE for all official Polymarket documentation. Fetches live https://docs.polymarket.com/llms.txt on every call. Use section= and summarize= for focused output.", when_to_use="First tool to call for any official Polymarket information (APIs, trading, gasless, deposit wallets, etc.). This is the authoritative source — not static markdown."),
+            ToolManifest(name="list_polymarket_docs", requires_auth=False, description="Structured categorized index of EVERY .md file referenced in the official llms.txt (trading, gasless, neg-risk, events, CLOB, concepts, WebSocket specs, etc.). Use with get_polymarket_doc().", when_to_use="Discover the full official documentation surface before reading specific pages."),
+            ToolManifest(name="get_polymarket_doc", requires_auth=False, description="Fetch the actual full (or summarized) content of any official Polymarket .md doc (e.g. 'trading/gasless.md', 'advanced/neg-risk.md', 'concepts/pusd.md', 'api-reference/authentication.md'). The way agents read the complete live docs via native tools.", when_to_use="Read the authoritative source for any topic (gasless setup, neg-risk mechanics, deposit wallets, event schemas, etc.)."),
             ToolManifest(name="get_midpoint", requires_auth=False, description="Midpoint price for a token_id.", when_to_use="Quick fair-value estimate."),
             ToolManifest(name="get_spread", requires_auth=False, description="Current bid-ask spread for a token_id.", when_to_use="Quick liquidity/tightness check."),
             ToolManifest(name="calculate_implied_probability", requires_auth=False, description="Price → probability", when_to_use="Think in probabilities not prices"),
@@ -962,20 +964,29 @@ STEP 2 (Primary recommended method):
   Put the real secrets (or ${VAR} references) inside the env: section:
 
 mcp_servers:
-  - name: polymarket
+  polymarket:                         # key = server name (tools will be prefixed mcp_polymarket_*)
     command: python
     args: ["-m", "polymarket_alpha"]
-    cwd: "C:\\\\Users\\\\<yourname>\\\\Desktop\\\\Alpha MCP"
+    cwd: "/absolute/path/to/Alpha MCP"   # IMPORTANT: use absolute path for Python stdio MCPs
     env:
-      PK: ${PK}                    # or paste the real 0x... key here
-      CLOB_API_KEY: ${CLOB_API_KEY}
-      CLOB_SECRET: ${CLOB_SECRET}
-      CLOB_PASS_PHRASE: ${CLOB_PASS_PHRASE}
+      PK: "${PK}"                    # Best practice: put real secrets in ~/.hermes/.env then reference here
+      CLOB_API_KEY: "${CLOB_API_KEY}"
+      CLOB_SECRET: "${CLOB_SECRET}"
+      CLOB_PASS_PHRASE: "${CLOB_PASS_PHRASE}"
       CLOB_API_URL: "https://clob.polymarket.com"
-      # FUNDER: "0xYourDepositWallet"   # required for most signature_type=3 users
-      # signature_type defaults to 3 inside the MCP
+      # FUNDER: "0xYourDepositWalletAddress"   # Required for signature_type=3 (deposit wallets). Must be the deposit/proxy address from polymarket.com Profile → Wallet, NOT your EOA.
+    # Optional but recommended for powerful servers:
+    # tools:
+    #   include: [get_mcp_health_report, check_clob_auth, search_markets, get_clob_token_ids, place_limit_order, ...]
+    #   prompts: false
+    #   resources: false
 
-After saving config.yaml (and .env if you created one), restart Hermes.
+After saving, restart Hermes or run /reload-mcp in chat.
+Then IMMEDIATELY call inside the agent:
+  get_mcp_health_report()
+  check_clob_auth(include_raw=true)   # mandatory first trading call
+
+See the live tool output of polymarket_alpha_setup_guide() for the most current block.
 
 **CRITICAL FOR MOST USERS (signature_type=3 / Deposit wallets):**
 - `funder` must be your DEPOSIT WALLET address (from polymarket.com Profile → Wallet), NOT your EOA.
@@ -1138,6 +1149,123 @@ For raw SDK decisions call get_unified_sdk_guidance().
                 result["note"] += f" (filtered for '{section}')"
         else:
             result["note"] = "Full official llms.txt returned. Use section=... and/or summarize=True for filtered/summarized views."
+
+        return result
+
+    # -------------------------------------------------------------------------
+    # Full official Polymarket documentation access (llms.txt + all linked .md)
+    # This fulfills the requirement that agents can read the complete docs
+    # (including every referenced .md) via native tool calls only.
+    # -------------------------------------------------------------------------
+
+    async def _fetch_polymarket_markdown(path: str, max_chars: int = 12000) -> str:
+        """Internal helper: fetch a docs.polymarket.com .md page and return cleaned text."""
+        if not path.endswith(".md"):
+            path = path + ".md" if not path.endswith("/") else path
+        url = f"https://docs.polymarket.com/{path.lstrip('/')}"
+        try:
+            async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
+                r = await client.get(url)
+                if r.status_code != 200:
+                    return f"Error fetching {url}: HTTP {r.status_code}"
+                text = r.text
+                if "Documentation Index" in text and "llms.txt" in text:
+                    lines = text.splitlines()
+                    start = 0
+                    for i, line in enumerate(lines):
+                        if line.strip().startswith("# ") and "Documentation Index" not in line:
+                            start = i
+                            break
+                    text = "\n".join(lines[start:])
+                if len(text) > max_chars:
+                    text = text[:max_chars] + "\n\n... (truncated)"
+                return text
+        except Exception as e:
+            return f"Error fetching doc: {e}"
+
+    @mcp.tool
+    def list_polymarket_docs() -> dict:
+        """
+        Returns a clean, categorized index of all official Polymarket documentation
+        .md files referenced by https://docs.polymarket.com/llms.txt.
+
+        This is the best starting point when an agent needs to discover the full
+        structure of official docs (trading, gasless, neg-risk, events, CLOB,
+        market makers, concepts, etc.).
+
+        Use the returned paths with get_polymarket_doc(path=...) to fetch actual content.
+        """
+        return {
+            "source": "https://docs.polymarket.com/llms.txt (live index)",
+            "note": "Call get_polymarket_doc(path) with any of the paths below to retrieve full markdown content. All content is fetched live on demand.",
+            "categories": {
+                "trading": [
+                    "trading/overview.md", "trading/quickstart.md", "trading/gasless.md",
+                    "trading/deposit-wallets.md", "trading/fees.md", "trading/orderbook.md",
+                    "trading/bridge/deposit.md", "trading/bridge/quote.md", "trading/bridge/status.md",
+                    "trading/ctf/overview.md", "trading/ctf/split.md", "trading/ctf/merge.md", "trading/ctf/redeem.md",
+                ],
+                "concepts": [
+                    "concepts/markets-events.md", "concepts/positions-tokens.md", "concepts/pusd.md",
+                    "advanced/neg-risk.md", "concepts/order-lifecycle.md", "concepts/prices-orderbook.md",
+                    "concepts/resolution.md",
+                ],
+                "api_reference": [
+                    "api-reference/authentication.md", "api-reference/introduction.md",
+                    "api-reference/events/list-events.md", "api-reference/events/get-event-by-id.md",
+                    "api-reference/markets/list-markets.md", "api-reference/markets/get-market-by-slug.md",
+                    "api-reference/wss/market.md", "api-reference/wss/user.md", "api-reference/wss/sports.md",
+                ],
+                "market_data_websocket": [
+                    "market-data/websocket/overview.md", "market-data/websocket/market-channel.md",
+                    "market-data/websocket/user-channel.md", "market-data/websocket/sports.md",
+                ],
+                "resources": [
+                    "resources/contracts.md", "resources/error-codes.md",
+                ],
+            },
+            "how_to_use": "1. list_polymarket_docs()  2. get_polymarket_doc(path='trading/gasless.md' or 'advanced/neg-risk.md' etc.)",
+        }
+
+    @mcp.tool
+    async def get_polymarket_doc(
+        path: str,
+        max_chars: int = 8000,
+        summarize: bool = False,
+    ) -> dict:
+        """
+        Fetch the full (or summarized) content of any official Polymarket .md documentation file
+        referenced in https://docs.polymarket.com/llms.txt.
+
+        This gives agents direct, native-tool access to the complete authoritative docs
+        (gasless flows, neg-risk mechanics, event schemas, CLOB auth, WebSocket specs,
+        deposit wallets, CTF split/merge/redeem, market data, etc.).
+
+        Primary paths (use list_polymarket_docs() for the full categorized list):
+          - "trading/gasless.md"
+          - "advanced/neg-risk.md"
+          - "concepts/pusd.md"
+          - "trading/deposit-wallets.md"
+          - "api-reference/authentication.md"
+          - "trading/ctf/split.md"
+        """
+        if not path:
+            return {"error": "path required. Call list_polymarket_docs() first to discover valid paths."}
+
+        raw = await _fetch_polymarket_markdown(path, max_chars=max_chars * 2 if summarize else max_chars)
+
+        result = {
+            "path": path,
+            "url": f"https://docs.polymarket.com/{path}",
+            "fetched_at": "live",
+            "content": raw,
+        }
+
+        if summarize and len(raw) > 1200:
+            lines = raw.splitlines()
+            headings = [l.strip() for l in lines if l.strip().startswith("#")][:6]
+            result["summary"] = "\n".join(headings) + "\n\n" + raw[:900] + "..."
+            result["note"] = "Light summary. Use summarize=false + higher max_chars for full text."
 
         return result
 
