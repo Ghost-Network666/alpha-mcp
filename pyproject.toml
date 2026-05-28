@@ -5,8 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "polymarket-alpha"
 version = "0.5.0"
-description = "Make Polymarket completely native inside Hermes, OpenClaw, and other agents. Full Gamma + CLOB + gasless + managed realtime WS + simulation + strategy cookbooks. 100+ tools. Minimal on-ramp README only — all deep documentation (including every official .md) delivered via native tool calls (get_polymarket_llms_txt, list_polymarket_docs, get_polymarket_doc)."
-# Documentation philosophy: tiny installation README only. All real content (llms.txt + every referenced .md file, Gamma/CLOB guidance, workflows) is served live through callable tools so agents always get fresh info.
+description = "Make Polymarket completely native inside Hermes, OpenClaw, and other agents. Full Gamma + CLOB trading + managed realtime WS + simulation + strategy cookbooks + gasless (core via polymarket-apis; advanced relayer features optional). 100+ tools. All docs via native calls (llms.txt + full sitemap + get_polymarket_doc)."
+# Core trading + most gasless works out of the box. Advanced relayer features (Safe deploy, low-level batches) are optional via `pip install "polymarket-alpha[gasless]"`.
+# All deep documentation is delivered via native tools (get_polymarket_llms_txt + get_polymarket_sitemap + get_polymarket_doc).
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [{name = "Alpha MCP"}]
@@ -23,8 +24,6 @@ classifiers = [
 dependencies = [
   "fastmcp>=3.2.0",
   "py-clob-client-v2>=1.0.0",
-  "py-builder-relayer-client>=0.1.0",
-  "py-builder-signing-sdk>=0.1.0",
   "polymarket-apis>=2.2.0",
   "pydantic>=2.5.0",
   "eth-account>=0.11.0",
@@ -34,6 +33,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest"]
+# Advanced gasless / relayer features (Safe deployment, low-level batches).
+# These packages are not always publicly installable. Core CLOB trading + most gasless
+# operations work without them (via polymarket-apis).
+gasless = [
+  "py-builder-relayer-client>=0.1.0",
+  "py-builder-signing-sdk>=0.1.0",
+]
 
 [project.scripts]
 polymarket-alpha = "polymarket_alpha.__main__:main"

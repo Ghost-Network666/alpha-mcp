@@ -957,6 +957,12 @@ REAL-TIME DATA (WebSocket — major MCP advantage):
             return base + """
 HERMES — RECOMMENDED NATIVE SETUP
 
+Install (most users):
+  pip install git+https://github.com/Ghost-Network666/alpha-mcp.git
+
+For advanced gasless (Safe deploy etc.):
+  pip install "git+https://github.com/Ghost-Network666/alpha-mcp.git[gasless]"
+
 STEP 1 (Optional but convenient for local testing):
   cp .env.example .env
   Then open .env and replace ALL placeholder values with your real CLOB credentials.

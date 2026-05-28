@@ -1,22 +1,15 @@
 """
 Gasless Relayer tools (Builder Program / Relayer integration).
 
-This module fully implements the previously "credential-ready only" gasless support.
+**Core gasless** (split/merge/redeem, approvals, transfers, wallet info, status):
+    Works after normal `pip install polymarket-alpha` (via polymarket-apis).
 
-Dedicated high-level tools for on-chain actions (CTF split/merge/redeem, approvals)
-that go through Polymarket's relayer so the user pays zero gas (Polymarket sponsors).
+**Advanced gasless** (e.g. `gasless_deploy_safe_wallet`, raw RelayClient access):
+    Requires the optional extra:
+        pip install "polymarket-alpha[gasless]"
 
-Also includes:
-- Balance tools for the correct gasless wallet addresses
-- Transfer tools (pUSD + tokens)
-- gasless_execute_custom() — low-level escape hatch for arbitrary gasless transactions
-
-Requires:
-- POLYMARKET_PRIVATE_KEY (base signer)
-- RELAYER_API_KEY (+ optional SECRET/PASSPHRASE for builder)
-- POLY_SIGNATURE_TYPE is optional (defaults to 3 = Deposit wallets). Valid values: 1=proxy, 2=Safe, 3=Deposit
-
-All tools gracefully error with setup instructions if creds missing.
+All tools return clear errors + installation hints when the extra packages are not present.
+POLY_SIGNATURE_TYPE defaults to 3 (Deposit wallets).
 """
 
 from fastmcp import FastMCP
@@ -239,8 +232,8 @@ def register_gasless_tools(mcp: FastMCP) -> None:
 
             return {
                 "status": "error",
-                "message": "Safe deployment requires either full Builder credentials or a working raw RelayClient.",
-                "hint": "Make sure RELAYER_API_SECRET + RELAYER_API_PASSPHRASE are set, and POLY_SIGNATURE_TYPE=3 (or your correct type)."
+                "message": "Safe deployment requires the optional relayer packages.",
+                "hint": "pip install \"polymarket-alpha[gasless]\" (or the equivalent in your environment). Then provide RELAYER_API_SECRET + RELAYER_API_PASSPHRASE (Builder pattern) or a remote signer. Current default is signature_type=3 (Deposit wallets)."
             }
         except Exception as e:
             return {

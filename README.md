@@ -7,13 +7,16 @@ Full Gamma discovery + CLOB trading + gasless relayer + managed real-time WebSoc
 ## Installation (recommended for agents)
 
 ```bash
-# Via pip (or uv)
+# Core (recommended for most users — CLOB trading + most gasless features)
 pip install git+https://github.com/Ghost-Network666/alpha-mcp.git
 
-# Or for development
+# With advanced gasless/relayer features (Safe deployment, low-level batches)
+pip install "git+https://github.com/Ghost-Network666/alpha-mcp.git[gasless]"
+
+# Development
 git clone https://github.com/Ghost-Network666/alpha-mcp.git
 cd alpha-mcp
-pip install -e .
+pip install -e ".[gasless]"
 ```
 
 ## Hermes Setup (primary target)
